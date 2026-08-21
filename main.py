@@ -6,23 +6,6 @@ create_database()
 
 app = FastAPI()
 
-tasks = [
-    {
-        "id": 1,
-        "title": "Finish internship assignment",
-        "done": False
-    },
-    {
-        "id": 2,
-        "title": "Read a book",
-        "done": False
-    },
-    {
-        "id": 3,
-        "title": "Watch a movie",
-        "done": True
-    }
-]
 
 class TaskCreate(BaseModel):
     title: str | None = None

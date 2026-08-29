@@ -1,69 +1,32 @@
-# Task management API
+# Task Management API
 
 A simple REST API for managing tasks, built with Python and FastAPI.
 
-This project was created as part of the FlyRank internship task. It demonstrates the basic CRUD operations:
-
-- Create tasks
-- Read tasks
-- Update tasks
-- Delete tasks
-
-The API stores tasks in a SQLite database, allowing task data to persist even after the server is restarted.
-
----
+This project was created as part of the FlyRank internship task. It demonstrates full CRUD operations using FastAPI with PostgreSQL as the database. The API and database run together using Docker Compose.
 
 ## Features
 
 - FastAPI REST API
-- SQLite database storage
-- Persistent task data
+- PostgreSQL database
+- Docker and Docker Compose
 - Create, read, update, and delete tasks
 - Input validation
 - Proper HTTP status codes
 - Automatic Swagger UI documentation
-
----
+- Persistent PostgreSQL data using a Docker volume
+- Environment variable configuration
 
 ## Requirements
 
-- Python 3.13
-- FastAPI
-- Uvicorn
-- SQLite
-
----
-
-## Installation
-
-Clone the repository:
-
-```bash
-git clone https://github.com/haneen09/flyrank.api.task.git
-cd flyrank.api.task
-```
-
-Create and activate a virtual environment:
-
-```powershell
-python -m venv venv
-venv\Scripts\Activate.ps1
-```
-
-Install the dependencies:
-
-```powershell
-pip install fastapi "uvicorn[standard]"
-```
-
----
+- Docker Desktop
+- Docker Compose
 
 ## Running the API
 
-Start the development server:
+The entire application stack can be started with one command:
 
-```powershell
-python -m fastapi dev main.py
+```bash
+docker compose up
 ```
 
 The API will be available at:
@@ -78,23 +41,94 @@ Swagger UI is available at:
 http://127.0.0.1:8000/docs
 ```
 
----
+To stop the application, press `Ctrl + C`.
+
+The containers can also be stopped and removed with:
+
+```bash
+docker compose down
+```
+
+The PostgreSQL data is stored in a Docker volume, so task data persists when the containers are stopped and started again.
+
+## Environment Variables
+
+The application uses the `DATABASE_URL` environment variable to connect to PostgreSQL.
+
+A sample environment file is included in the project as:
+
+```text
+.env.example
+```
+
+Copy the example file to `.env` and configure the database connection:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+The database URL is:
+
+```text
+DATABASE_URL=postgres://postgres:dev@localhost:5432/tasks
+```
+
+The `.env` file is ignored by Git and should not be committed to the repository.
+
+When the application runs through Docker Compose, the FastAPI container connects to the PostgreSQL container using the Docker Compose service name `db`.
 
 ## Database
 
-This project uses SQLite to store task data.
+The API uses PostgreSQL for persistent task storage.
 
-SQLite was chosen because it is lightweight, requires no separate database server, and stores the entire database in a single file. Task data persists after the FastAPI server is restarted.
+PostgreSQL runs in its own Docker container using the official PostgreSQL image. The FastAPI application connects to PostgreSQL through the Docker Compose network.
 
-The database is stored locally in:
+The database configuration is:
 
 ```text
-tasks.db
+Database: tasks
+User: postgres
+Password: dev
+Host: db
+Port: 5432
 ```
 
-The database and the `tasks` table are created automatically when the application starts. If the database is empty, three example tasks are added automatically.
+The database uses a persistent Docker volume named `taskdata`.
 
----
+This allows task data to remain available after the containers are stopped and started again.
+
+The `tasks` table is created automatically when the application starts. If the table is empty, three example tasks are inserted automatically.
+
+## Database Verification
+
+The PostgreSQL database can be accessed directly through the running database container:
+
+```powershell
+docker compose exec db psql -U postgres -d tasks
+```
+
+The available tables can be checked with:
+
+```sql
+\dt
+```
+
+The stored tasks can be viewed with:
+
+```sql
+SELECT * FROM tasks;
+```
+
+Example database output:
+
+```text
+ id |       title        | done
+----+--------------------+------
+  1 | Learn PostgreSQL   | f
+  2 | Build the database | f
+  3 | Test the API       | f
+  5 | Stage 4 docker test| f
+```
 
 ## API Endpoints
 
@@ -106,9 +140,7 @@ The database and the `tasks` table are created automatically when the applicatio
 | GET | `/tasks/{id}` | Returns a single task by ID |
 | POST | `/tasks` | Creates a new task |
 | PUT | `/tasks/{id}` | Updates an existing task |
-| DELETE | `/tasks/{id}` | Deletes a task |
-
----
+| DELETE | `/tasks/{id}` | Deletes an existing task |
 
 ## Example: Health Check
 
@@ -127,31 +159,22 @@ content-type: application/json
 {"status":"ok"}
 ```
 
----
+## Example: Get Tasks
 
-## Example Task
+### Request
 
-A task has the following structure:
-
-```json
-{
-  "id": 1,
-  "title": "Example task",
-  "done": false
-}
+```bash
+curl -i http://127.0.0.1:8000/tasks
 ```
 
-When creating a task, only the title is required:
+### Response
 
-```json
-{
-  "title": "Go for a walk"
-}
+```text
+HTTP/1.1 200 OK
+content-type: application/json
+
+[{"id":1,"title":"Learn PostgreSQL","done":false},{"id":2,"title":"Build the database","done":false},{"id":3,"title":"Test the API","done":false},{"id":5,"title":"Stage 4 docker test","done":false}]
 ```
-
-The API automatically assigns the ID and sets `done` to `false`.
-
----
 
 ## CRUD Operations
 
@@ -165,7 +188,7 @@ Example request:
 
 ```json
 {
-  "title": "Read a new book"
+  "title": "Go for a walk"
 }
 ```
 
@@ -190,7 +213,7 @@ Example request:
 
 ```json
 {
-  "title": "Read a whole book",
+  "title": "Finish the task",
   "done": true
 }
 ```
@@ -205,8 +228,6 @@ DELETE /tasks/{id}
 
 Returns `204 No Content` when successful.
 
----
-
 ## Error Handling
 
 The API returns appropriate HTTP status codes for invalid requests.
@@ -214,9 +235,8 @@ The API returns appropriate HTTP status codes for invalid requests.
 - `400 Bad Request` — missing or empty task title
 - `404 Not Found` — task does not exist
 - `201 Created` — task successfully created
+- `200 OK` — task successfully retrieved or updated
 - `204 No Content` — task successfully deleted
-
----
 
 ## Swagger UI
 
@@ -228,98 +248,43 @@ Open:
 http://127.0.0.1:8000/docs
 ```
 
-All API endpoints can be tested directly through Swagger UI.
-
 ### Swagger Screenshot
 
 ![Swagger UI](swagger.png)
 
----
+## PostgreSQL Database Screenshot
 
-## Database Screenshot
+The PostgreSQL database was inspected directly using `psql`.
 
-The SQLite database was explored using DB Browser for SQLite.
+The screenshot shows the `tasks` table using `\dt` and the stored task data using `SELECT * FROM tasks`.
 
-![SQLite Database](database.png)
+![PostgreSQL Database](database1.png)
 
----
+## Persistence Verification
 
-## SQLite Exploration
+The PostgreSQL persistence was tested by creating a task through the API and then stopping and restarting the Docker Compose stack.
 
-During Stage 4, I used DB Browser for SQLite to interact directly with the `tasks.db` database.
-
-I ran the following SQL queries:
-
-```sql
-SELECT * FROM tasks;
-```
-
-This returned all tasks currently stored in the database.
-
-```sql
-SELECT * FROM tasks WHERE done = 1;
-```
-
-This returned all tasks marked as completed.
-
-```sql
-SELECT COUNT(*) FROM tasks;
-```
-
-This returned the total number of tasks in the database.
-
-I also used SQL to update and delete tasks manually. After deleting the tasks, I inserted new tasks directly into the database using SQL and verified that the changes were reflected through the API using `GET /tasks`.
-
-The tasks currently returned by the API include:
-
-```json
-[
-  {
-    "id": 7,
-    "title": "finish w3",
-    "done": false
-  },
-  {
-    "id": 8,
-    "title": "finish w3",
-    "done": false
-  },
-  {
-    "id": 9,
-    "title": "build the database",
-    "done": false
-  }
-]
-```
-## Database Verification
-
-To verify that the database can be created automatically, `tasks.db` was removed and the application was started again.
-
-The application automatically recreated the database, created the `tasks` table, and added the three example tasks:
-
-- Learn SQLite
-- Build the database
-- Test the API
-
-This confirmed that a fresh database can be created automatically when the application starts.
-
----
+The task remained available after restarting the containers, confirming that PostgreSQL data is persisted using the Docker volume.
 
 ## Project Structure
 
 ```text
-flyrank/
+task-management-api/
 ├── main.py
 ├── database.py
 ├── README.md
+├── Dockerfile
+├── compose.yaml
+├── requirements.txt
+├── .dockerignore
+├── .env.example
 ├── swagger.png
-├── database.png
-├── .gitignore
-└── tasks.db (created automatically and not tracked by Git)
+├── database1.png
+└── .gitignore
 ```
 
----
+The `.env` file and local database files are not tracked by Git.
 
 ## GitHub Repository
 
-https://github.com/haneen09/flyrank.api.task
+Repository: `haneen09/task-management-api`

@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from database import create_database, get_connection
+from supabase_client import supabase
 
 create_database()
 

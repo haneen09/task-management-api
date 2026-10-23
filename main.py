@@ -1,31 +1,16 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from database import create_database, get_connection
+from supabase_client import supabase
 
 create_database()
 
 app = FastAPI()
 
-tasks = [
-    {
-        "id": 1,
-        "title": "Finish internship assignment",
-        "done": False
-    },
-    {
-        "id": 2,
-        "title": "Read a book",
-        "done": False
-    },
-    {
-        "id": 3,
-        "title": "Watch a movie",
-        "done": True
-    }
-]
 
 class TaskCreate(BaseModel):
     title: str | None = None
+
 
 class TaskUpdate(BaseModel):
     title: str | None = None
@@ -53,7 +38,7 @@ def get_tasks():
     connection = get_connection()
     cursor = connection.cursor()
 
-    cursor.execute("SELECT * FROM tasks")
+    cursor.execute("SELECT * FROM tasks ORDER BY id")
     rows = cursor.fetchall()
 
     connection.close()
@@ -62,7 +47,7 @@ def get_tasks():
         {
             "id": row[0],
             "title": row[1],
-            "done": bool(row[2])
+            "done": row[2]
         }
         for row in rows
     ]
@@ -74,7 +59,7 @@ def get_task(id: int):
     cursor = connection.cursor()
 
     cursor.execute(
-        "SELECT * FROM tasks WHERE id = ?",
+        "SELECT * FROM tasks WHERE id = %s",
         (id,)
     )
 
@@ -91,9 +76,8 @@ def get_task(id: int):
     return {
         "id": row[0],
         "title": row[1],
-        "done": bool(row[2])
+        "done": row[2]
     }
-
 
 
 @app.post("/tasks", status_code=201, description="Creates a new task.")
@@ -108,11 +92,15 @@ def create_task(task: TaskCreate):
     cursor = connection.cursor()
 
     cursor.execute(
-        "INSERT INTO tasks (title, done) VALUES (?, ?)",
-        (task.title, 0)
+        """
+        INSERT INTO tasks (title, done)
+        VALUES (%s, %s)
+        RETURNING id
+        """,
+        (task.title, False)
     )
 
-    new_id = cursor.lastrowid
+    new_id = cursor.fetchone()[0]
 
     connection.commit()
     connection.close()
@@ -136,7 +124,7 @@ def update_task(id: int, task_update: TaskUpdate):
     cursor = connection.cursor()
 
     cursor.execute(
-        "SELECT * FROM tasks WHERE id = ?",
+        "SELECT * FROM tasks WHERE id = %s",
         (id,)
     )
 
@@ -158,12 +146,16 @@ def update_task(id: int, task_update: TaskUpdate):
     new_done = (
         task_update.done
         if task_update.done is not None
-        else bool(existing_task[2])
+        else existing_task[2]
     )
 
     cursor.execute(
-        "UPDATE tasks SET title = ?, done = ? WHERE id = ?",
-        (new_title, int(new_done), id)
+        """
+        UPDATE tasks
+        SET title = %s, done = %s
+        WHERE id = %s
+        """,
+        (new_title, new_done, id)
     )
 
     connection.commit()
@@ -182,7 +174,7 @@ def delete_task(id: int):
     cursor = connection.cursor()
 
     cursor.execute(
-        "DELETE FROM tasks WHERE id = ?",
+        "DELETE FROM tasks WHERE id = %s",
         (id,)
     )
 
